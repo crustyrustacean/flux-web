@@ -185,8 +185,8 @@ This is a learning project and personal experiment. Feel free to fork and experi
 
 | Framework | Philosophy |
 |-----------|-----------|
-| **Axum** | Type-heavy, extractor-focused |
-| **Actix-Web** | Full-featured, actor-based |
+| **Axum** | Type-heavy, extractor-focused, total DIY |
+| **Actix-Web** | Full-featured, high-performance |
 | **Warp** | Filter combinators |
 | **Flux Web** | Express-like simplicity |
 
