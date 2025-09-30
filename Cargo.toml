@@ -1,6 +1,6 @@
 [package]
 name = "flux-web"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2024"
 authors = ["Jeffery D. Mitchell <crusty-rustacean@gmail.com>"]
 description = "An experiment in building a web application framework similar to ExpressJS"
@@ -22,3 +22,8 @@ name = "flux_web_lib"
 hyper = { version = "1.7.0", features = ["full"] }
 hyper-util = { version = "0.1.17", features = ["full"] }
 tokio = { version = "1.47.1", features = ["full"] }
+
+[dev-dependencies]
+http-body-util = "0.1"
+
+
