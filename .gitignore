@@ -1,0 +1,11 @@
+# gitignore configuration for the flux-web project
+
+# Editor Settings
+.vscode
+.zed
+
+# Environment Variables
+.env
+
+# Build Artifacts
+/target
