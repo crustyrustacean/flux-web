@@ -7,5 +7,8 @@
 # Environment Variables
 .env
 
+# System Files
+.DS_Store
+
 # Build Artifacts
 /target
