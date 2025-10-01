@@ -12,23 +12,24 @@ use flux_web_lib::{App, AppRequest, AppResponse};
 #[tokio::main]
 async fn main() {
     let mut app = App::new();
-    
-    app.get("/", |_req: &AppRequest| AppResponse {
-        status: 200,
-        body: "Hello, World!".to_string(),
+
+    app.get("/", |_req: &AppRequest| {
+        AppResponse::new(200, "Hello, World!")
+            .with_header("Content-Type", "text/plain")
     });
-    
+
     app.listen(8000).await;
 }
 ```
 
 ## Features
 
-✅ **Express-like API** - Familiar chainable methods  
-✅ **Async/await** - Built on Tokio and Hyper for performance  
-✅ **All HTTP methods** - GET, POST, PUT, PATCH, DELETE  
-✅ **Simple routing** - Exact path matching  
-✅ **Minimal dependencies** - Just Tokio and Hyper for infrastructure  
+✅ **Express-like API** - Familiar chainable methods
+✅ **Async/await** - Built on Tokio and Hyper for performance
+✅ **All HTTP methods** - GET, POST, PUT, PATCH, DELETE
+✅ **Request & Response Headers** - Full header support
+✅ **Simple routing** - Exact path matching
+✅ **Minimal dependencies** - Just Tokio and Hyper for infrastructure
 ✅ **Type-safe** - Leverage Rust's type system without complexity  
 
 ## Installation
@@ -49,21 +50,21 @@ use flux_web_lib::{App, AppRequest, AppResponse};
 #[tokio::main]
 async fn main() {
     let mut app = App::new();
-    
+
     // Define routes
-    app.get("/", |_req: &AppRequest| AppResponse {
-        status: 200,
-        body: "Home Page".to_string(),
+    app.get("/", |_req: &AppRequest| {
+        AppResponse::new(200, "Home Page")
+            .with_header("Content-Type", "text/html")
     })
-    .get("/about", |_req: &AppRequest| AppResponse {
-        status: 200,
-        body: "About Page".to_string(),
+    .get("/about", |_req: &AppRequest| {
+        AppResponse::new(200, "About Page")
+            .with_header("Content-Type", "text/plain")
     })
-    .post("/users", |_req: &AppRequest| AppResponse {
-        status: 201,
-        body: "User created".to_string(),
+    .post("/users", |_req: &AppRequest| {
+        AppResponse::new(201, "User created")
+            .with_header("Content-Type", "application/json")
     });
-    
+
     // Start server
     println!("Server running on http://localhost:8000");
     app.listen(8000).await;
@@ -90,10 +91,9 @@ Handlers are simple functions that take a request and return a response:
 
 ```rust
 fn hello_handler(req: &AppRequest) -> AppResponse {
-    AppResponse {
-        status: 200,
-        body: format!("Hello from {}!", req.path),
-    }
+    AppResponse::new(200, format!("Hello from {}!", req.path))
+        .with_header("Content-Type", "text/plain")
+        .with_header("X-Custom-Header", "Flux-Web")
 }
 
 app.get("/hello", hello_handler);
@@ -102,9 +102,9 @@ app.get("/hello", hello_handler);
 Or use closures:
 
 ```rust
-app.get("/inline", |req: &AppRequest| AppResponse {
-    status: 200,
-    body: "Inline handler".to_string(),
+app.get("/inline", |req: &AppRequest| {
+    AppResponse::new(200, "Inline handler")
+        .with_header("Content-Type", "text/plain")
 });
 ```
 
@@ -113,23 +113,64 @@ app.get("/inline", |req: &AppRequest| AppResponse {
 Set any HTTP status code:
 
 ```rust
-app.get("/created", |_req: &AppRequest| AppResponse {
-    status: 201,
-    body: "Resource created".to_string(),
+app.get("/created", |_req: &AppRequest| {
+    AppResponse::new(201, "Resource created")
+        .with_header("Content-Type", "application/json")
+        .with_header("Location", "/resource/123")
 })
-.get("/error", |_req: &AppRequest| AppResponse {
-    status: 500,
-    body: "Internal Server Error".to_string(),
+.get("/error", |_req: &AppRequest| {
+    AppResponse::new(500, "Internal Server Error")
+        .with_header("Content-Type", "text/plain")
+});
+```
+
+### Working with Headers
+
+**Request Headers:**
+Access incoming request headers through the `AppRequest`:
+
+```rust
+app.get("/headers", |req: &AppRequest| {
+    let user_agent = req.headers.get("user-agent")
+        .unwrap_or(&"Unknown".to_string());
+
+    AppResponse::new(200, format!("Your user agent: {}", user_agent))
+        .with_header("Content-Type", "text/plain")
+});
+```
+
+**Response Headers:**
+Set response headers using the builder pattern:
+
+```rust
+app.get("/api/data", |_req: &AppRequest| {
+    AppResponse::new(200, r#"{"message": "Hello, API!"}"#)
+        .with_header("Content-Type", "application/json")
+        .with_header("Access-Control-Allow-Origin", "*")
+        .with_header("Cache-Control", "no-cache")
+});
+```
+
+**Multiple Headers:**
+Chain multiple `.with_header()` calls:
+
+```rust
+app.post("/upload", |_req: &AppRequest| {
+    AppResponse::new(201, "File uploaded successfully")
+        .with_header("Content-Type", "text/plain")
+        .with_header("Location", "/files/123")
+        .with_header("X-Upload-Status", "completed")
 });
 ```
 
 ### 404 Not Found
 
-Unmatched routes automatically return 404:
+Unmatched routes automatically return 404 with proper headers:
 
 ```rust
 // Request to /unknown automatically returns:
 // Status: 404
+// Headers: Content-Type: text/plain
 // Body: "Not Found"
 ```
 
@@ -137,6 +178,8 @@ Unmatched routes automatically return 404:
 
 **Working:**
 - ✅ All HTTP methods (GET, POST, PUT, PATCH, DELETE)
+- ✅ Request headers access
+- ✅ Response headers support
 - ✅ Exact path matching
 - ✅ Custom status codes
 - ✅ Concurrent request handling
@@ -173,6 +216,7 @@ cargo test
 Integration tests cover:
 - Route matching
 - HTTP methods
+- Request/response headers
 - Status codes
 - 404 handling
 - Concurrent requests

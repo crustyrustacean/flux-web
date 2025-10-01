@@ -1,50 +1,23 @@
 // tests/integration_tests.rs
 
+// dependencies
+use crate::helpers::{make_request, make_request_with_headers, make_request_with_method_and_headers, start_test_server};
 use flux_web_lib::{App, AppRequest, AppResponse};
 use http_body_util::{BodyExt, Empty};
 use hyper::body::Bytes;
 use hyper_util::client::legacy::Client;
 use hyper_util::rt::TokioExecutor;
-use std::time::Duration;
-use tokio::time::sleep;
+use std::collections::HashMap;
 
-// Helper function to make HTTP requests
-async fn make_request(
-    url: &str,
-) -> Result<(u16, String), Box<dyn std::error::Error + Send + Sync>> {
-    let client = Client::builder(TokioExecutor::new()).build_http();
-
-    let uri: hyper::Uri = url.parse()?;
-    let req = hyper::Request::builder()
-        .uri(uri)
-        .body(Empty::<Bytes>::new())?;
-
-    let res = client.request(req).await?;
-    let status = res.status().as_u16();
-
-    let body_bytes = res.into_body().collect().await?.to_bytes();
-    let body = String::from_utf8(body_bytes.to_vec())?;
-
-    Ok((status, body))
-}
-
-// Helper to start server in background
-async fn start_test_server(port: u16, app: App) {
-    tokio::spawn(async move {
-        app.listen(port).await;
-    });
-
-    // Give server time to start
-    sleep(Duration::from_millis(100)).await;
-}
+// module declarations
+mod helpers;
 
 #[tokio::test]
 async fn test_basic_get_route() {
     let mut app = App::new();
 
-    app.get("/", |_req: &AppRequest| AppResponse {
-        status: 200,
-        body: "Hello World!".to_string(),
+    app.get("/", |_req: &AppRequest| {
+        AppResponse::new(200, "Hello World!").with_header("Content-Type", "text/plain")
     });
 
     start_test_server(8001, app).await;
@@ -61,13 +34,11 @@ async fn test_basic_get_route() {
 async fn test_multiple_routes() {
     let mut app = App::new();
 
-    app.get("/home", |_req: &AppRequest| AppResponse {
-        status: 200,
-        body: "Home Page".to_string(),
+    app.get("/home", |_req: &AppRequest| {
+        AppResponse::new(200, "Home Page").with_header("Content-Type", "text/plain")
     })
-    .get("/about", |_req: &AppRequest| AppResponse {
-        status: 200,
-        body: "About Page".to_string(),
+    .get("/about", |_req: &AppRequest| {
+        AppResponse::new(200, "About Page").with_header("Content-Type", "text/plain")
     });
 
     start_test_server(8002, app).await;
@@ -89,9 +60,8 @@ async fn test_multiple_routes() {
 async fn test_not_found() {
     let mut app = App::new();
 
-    app.get("/exists", |_req: &AppRequest| AppResponse {
-        status: 200,
-        body: "Found".to_string(),
+    app.get("/exists", |_req: &AppRequest| {
+        AppResponse::new(200, "Hello, world!").with_header("Content-Type", "text/plain")
     });
 
     start_test_server(8003, app).await;
@@ -108,13 +78,11 @@ async fn test_not_found() {
 async fn test_different_status_codes() {
     let mut app = App::new();
 
-    app.get("/created", |_req: &AppRequest| AppResponse {
-        status: 201,
-        body: "Resource created".to_string(),
+    app.get("/created", |_req: &AppRequest| {
+        AppResponse::new(201, "Resource created").with_header("Content-Type", "text/plain")
     })
-    .get("/error", |_req: &AppRequest| AppResponse {
-        status: 500,
-        body: "Internal Server Error".to_string(),
+    .get("/error", |_req: &AppRequest| {
+        AppResponse::new(500, "Internal Server Error").with_header("Content-Type", "text/plain")
     });
 
     start_test_server(8004, app).await;
@@ -136,9 +104,9 @@ async fn test_different_status_codes() {
 async fn test_request_path_available() {
     let mut app = App::new();
 
-    app.get("/echo", |req: &AppRequest| AppResponse {
-        status: 200,
-        body: format!("You requested: {}", req.path),
+    app.get("/echo", |req: &AppRequest| {
+        AppResponse::new(200, format!("You requested: {}", req.path))
+            .with_header("Content-Type", "text/plain")
     });
 
     start_test_server(8005, app).await;
@@ -155,25 +123,20 @@ async fn test_request_path_available() {
 async fn test_all_http_methods() {
     let mut app = App::new();
 
-    app.get("/resource", |_req: &AppRequest| AppResponse {
-        status: 200,
-        body: "GET".to_string(),
+    app.get("/resource", |_req: &AppRequest| {
+        AppResponse::new(200, "GET").with_header("Content-Type", "text/plain")
     })
-    .post("/resource", |_req: &AppRequest| AppResponse {
-        status: 200,
-        body: "POST".to_string(),
+    .post("/resource", |_req: &AppRequest| {
+        AppResponse::new(200, "POST").with_header("Content-Type", "text/plain")
     })
-    .put("/resource", |_req: &AppRequest| AppResponse {
-        status: 200,
-        body: "PUT".to_string(),
+    .put("/resource", |_req: &AppRequest| {
+        AppResponse::new(200, "PUT").with_header("Content-Type", "text/plain")
     })
-    .patch("/resource", |_req: &AppRequest| AppResponse {
-        status: 200,
-        body: "PATCH".to_string(),
+    .patch("/resource", |_req: &AppRequest| {
+        AppResponse::new(200, "PATCH").with_header("Content-Type", "text/plain")
     })
-    .delete("/resource", |_req: &AppRequest| AppResponse {
-        status: 200,
-        body: "DELETE".to_string(),
+    .delete("/resource", |_req: &AppRequest| {
+        AppResponse::new(200, "DELETE").with_header("Content-Type", "text/plain")
     });
 
     start_test_server(8006, app).await;
@@ -280,9 +243,9 @@ async fn test_all_http_methods() {
 async fn test_concurrent_requests() {
     let mut app = App::new();
 
-    app.get("/concurrent", |_req: &AppRequest| AppResponse {
-        status: 200,
-        body: "Concurrent response".to_string(),
+    app.get("/concurrent", |_req: &AppRequest| {
+        AppResponse::new(200, "Concurrent response".to_string())
+            .with_header("Content-Type", "text/plain")
     });
 
     start_test_server(8007, app).await;
@@ -298,4 +261,211 @@ async fn test_concurrent_requests() {
         assert_eq!(result.0, 200);
         assert_eq!(result.1, "Concurrent response");
     }
+}
+
+// ===== HEADER FUNCTIONALITY TESTS =====
+
+#[tokio::test]
+async fn test_request_headers_are_accessible() {
+    let mut app = App::new();
+
+    app.get("/headers", |req: &AppRequest| {
+        let user_agent = req.headers.get("user-agent")
+            .map(|s| s.as_str())
+            .unwrap_or("Unknown");
+        let custom_header = req.headers.get("x-custom-header")
+            .map(|s| s.as_str())
+            .unwrap_or("Not found");
+
+        AppResponse::new(200, format!("User-Agent: {}, Custom: {}", user_agent, custom_header))
+            .with_header("Content-Type", "text/plain")
+    });
+
+    start_test_server(8008, app).await;
+
+    let mut headers = HashMap::new();
+    headers.insert("user-agent", "Flux-Web-Test/1.0");
+    headers.insert("x-custom-header", "test-value");
+
+    let (status, body, _response_headers) = make_request_with_headers("http://127.0.0.1:8008/headers", headers)
+        .await
+        .expect("Request failed");
+
+    assert_eq!(status, 200);
+    assert_eq!(body, "User-Agent: Flux-Web-Test/1.0, Custom: test-value");
+}
+
+#[tokio::test]
+async fn test_response_headers_are_set() {
+    let mut app = App::new();
+
+    app.get("/api/data", |_req: &AppRequest| {
+        AppResponse::new(200, r#"{"message": "Hello, API!"}"#)
+            .with_header("Content-Type", "application/json")
+            .with_header("Access-Control-Allow-Origin", "*")
+            .with_header("Cache-Control", "no-cache")
+            .with_header("X-API-Version", "1.0")
+    });
+
+    start_test_server(8009, app).await;
+
+    let (status, body, response_headers) = make_request_with_headers("http://127.0.0.1:8009/api/data", HashMap::new())
+        .await
+        .expect("Request failed");
+
+    assert_eq!(status, 200);
+    assert_eq!(body, r#"{"message": "Hello, API!"}"#);
+
+    // Check response headers
+    assert_eq!(response_headers.get("content-type"), Some(&"application/json".to_string()));
+    assert_eq!(response_headers.get("access-control-allow-origin"), Some(&"*".to_string()));
+    assert_eq!(response_headers.get("cache-control"), Some(&"no-cache".to_string()));
+    assert_eq!(response_headers.get("x-api-version"), Some(&"1.0".to_string()));
+}
+
+#[tokio::test]
+async fn test_multiple_headers_chaining() {
+    let mut app = App::new();
+
+    app.post("/upload", |_req: &AppRequest| {
+        AppResponse::new(201, "File uploaded successfully")
+            .with_header("Content-Type", "text/plain")
+            .with_header("Location", "/files/123")
+            .with_header("X-Upload-Status", "completed")
+            .with_header("X-File-Size", "1024")
+            .with_header("X-Processing-Time", "50ms")
+    });
+
+    start_test_server(8010, app).await;
+
+    let (status, body, response_headers) = make_request_with_method_and_headers(
+        "http://127.0.0.1:8010/upload",
+        "POST",
+        HashMap::new()
+    )
+        .await
+        .expect("Request failed");
+
+    assert_eq!(status, 201);
+    assert_eq!(body, "File uploaded successfully");
+
+    // Verify all chained headers are present
+    assert_eq!(response_headers.get("content-type"), Some(&"text/plain".to_string()));
+    assert_eq!(response_headers.get("location"), Some(&"/files/123".to_string()));
+    assert_eq!(response_headers.get("x-upload-status"), Some(&"completed".to_string()));
+    assert_eq!(response_headers.get("x-file-size"), Some(&"1024".to_string()));
+    assert_eq!(response_headers.get("x-processing-time"), Some(&"50ms".to_string()));
+}
+
+#[tokio::test]
+async fn test_request_headers_case_insensitive_access() {
+    let mut app = App::new();
+
+    app.get("/case-test", |req: &AppRequest| {
+        // Headers should be lowercase when stored
+        let content_type = req.headers.get("content-type")
+            .map(|s| s.as_str())
+            .unwrap_or("text/plain");
+        let authorization = req.headers.get("authorization")
+            .map(|s| s.as_str())
+            .unwrap_or("none");
+
+        AppResponse::new(200, format!("Content-Type: {}, Auth: {}", content_type, authorization))
+            .with_header("Content-Type", "text/plain")
+    });
+
+    start_test_server(8011, app).await;
+
+    let mut headers = HashMap::new();
+    headers.insert("Content-Type", "application/json");  // Mixed case
+    headers.insert("Authorization", "Bearer token123");   // Mixed case
+
+    let (status, body, _response_headers) = make_request_with_headers("http://127.0.0.1:8011/case-test", headers)
+        .await
+        .expect("Request failed");
+
+    assert_eq!(status, 200);
+    assert_eq!(body, "Content-Type: application/json, Auth: Bearer token123");
+}
+
+#[tokio::test]
+async fn test_missing_request_headers_handled() {
+    let mut app = App::new();
+
+    app.get("/optional-headers", |req: &AppRequest| {
+        let optional_header = req.headers.get("x-optional-header")
+            .cloned()
+            .unwrap_or_else(|| "default-value".to_string());
+
+        AppResponse::new(200, format!("Optional header: {}", optional_header))
+            .with_header("Content-Type", "text/plain")
+    });
+
+    start_test_server(8012, app).await;
+
+    // Test without the optional header
+    let (status, body, _response_headers) = make_request_with_headers("http://127.0.0.1:8012/optional-headers", HashMap::new())
+        .await
+        .expect("Request failed");
+
+    assert_eq!(status, 200);
+    assert_eq!(body, "Optional header: default-value");
+
+    // Test with the optional header
+    let mut headers = HashMap::new();
+    headers.insert("x-optional-header", "provided-value");
+
+    let (status, body, _response_headers) = make_request_with_headers("http://127.0.0.1:8012/optional-headers", headers)
+        .await
+        .expect("Request failed");
+
+    assert_eq!(status, 200);
+    assert_eq!(body, "Optional header: provided-value");
+}
+
+#[tokio::test]
+async fn test_404_response_has_default_headers() {
+    let mut app = App::new();
+
+    app.get("/exists", |_req: &AppRequest| {
+        AppResponse::new(200, "Found").with_header("Content-Type", "text/plain")
+    });
+
+    start_test_server(8013, app).await;
+
+    let (status, body, response_headers) = make_request_with_headers("http://127.0.0.1:8013/does-not-exist", HashMap::new())
+        .await
+        .expect("Request failed");
+
+    assert_eq!(status, 404);
+    assert_eq!(body, "Not Found");
+
+    // 404 responses should have default Content-Type header
+    assert_eq!(response_headers.get("content-type"), Some(&"text/plain".to_string()));
+}
+
+#[tokio::test]
+async fn test_header_override_within_response() {
+    let mut app = App::new();
+
+    app.get("/override", |_req: &AppRequest| {
+        AppResponse::new(200, "Response with overridden header")
+            .with_header("Content-Type", "text/plain")
+            .with_header("X-Version", "1.0")
+            .with_header("Content-Type", "application/json")  // Override previous Content-Type
+            .with_header("X-Version", "2.0")  // Override previous X-Version
+    });
+
+    start_test_server(8014, app).await;
+
+    let (status, body, response_headers) = make_request_with_headers("http://127.0.0.1:8014/override", HashMap::new())
+        .await
+        .expect("Request failed");
+
+    assert_eq!(status, 200);
+    assert_eq!(body, "Response with overridden header");
+
+    // Last header value should win
+    assert_eq!(response_headers.get("content-type"), Some(&"application/json".to_string()));
+    assert_eq!(response_headers.get("x-version"), Some(&"2.0".to_string()));
 }

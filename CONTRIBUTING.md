@@ -95,28 +95,54 @@ All new features must include tests:
 - Tests should use descriptive names
 - Each test should verify one thing
 
+**Header Testing Guidelines:**
+- Always set `Content-Type` headers in test responses
+- Test both request header access and response header setting
+- Use the new `AppResponse::new()` constructor in all tests
+- Chain `.with_header()` calls for multiple headers
+
 Example:
 ```rust
 #[tokio::test]
 async fn test_query_params_are_parsed() {
     let mut app = App::new();
-    
+
     app.get("/search", |req: &AppRequest| {
         let query = req.query_param("q").unwrap_or("none");
-        AppResponse {
-            status: 200,
-            body: format!("Searching for: {}", query),
-        }
+        AppResponse::new(200, format!("Searching for: {}", query))
+            .with_header("Content-Type", "text/plain")
     });
-    
+
     start_test_server(8010, app).await;
-    
+
     let (status, body) = make_request("http://127.0.0.1:8010/search?q=rust")
         .await
         .expect("Request failed");
-    
+
     assert_eq!(status, 200);
     assert_eq!(body, "Searching for: rust");
+}
+```
+
+**Header Testing Example:**
+```rust
+#[tokio::test]
+async fn test_request_headers_are_accessible() {
+    let mut app = App::new();
+
+    app.get("/headers", |req: &AppRequest| {
+        let user_agent = req.headers.get("user-agent")
+            .unwrap_or(&"Unknown".to_string());
+
+        AppResponse::new(200, format!("User-Agent: {}", user_agent))
+            .with_header("Content-Type", "text/plain")
+            .with_header("X-Custom-Header", "Flux-Web")
+    });
+
+    start_test_server(8011, app).await;
+
+    // Test would include making request with specific headers
+    // and verifying both response body and response headers
 }
 ```
 
@@ -142,6 +168,7 @@ Good:
 - Add query parameter parsing to AppRequest
 - Fix panic when request path contains invalid UTF-8
 - Implement middleware support for request/response pipeline
+- feat: add request/response header support with AppResponse::new()
 
 Bad:
 - Fixed stuff
@@ -149,9 +176,18 @@ Bad:
 - Changes
 ```
 
+**Note on API Changes:**
+Since this is a learning project, breaking changes are expected. Always:
+- Use the new `AppResponse::new()` constructor in examples
+- Include headers with `.with_header()` in test responses
+- Access request headers via `req.headers.get()`
+
 ## Development Priorities
 
-Current focus areas (in order):
+**Recently Completed:**
+- ✅ **Request/Response Headers** - Full header support with `AppRequest.headers` and `AppResponse.with_header()`
+
+**Current focus areas (in order):**
 
 1. **Request parsing** - Body, query params, path params
 2. **Response helpers** - JSON, redirects, status shortcuts

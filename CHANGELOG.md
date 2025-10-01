@@ -8,7 +8,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Planned
-- Request headers support
 - Request body parsing (JSON, form data)
 - Query parameter parsing
 - Path parameters (e.g., `/users/:id`)
@@ -17,6 +16,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Static file serving
 - Template rendering (Tera)
 - Rate limiting
+
+## [0.3.0] - 2025-09-30
+
+### Added
+- Request headers support in `AppRequest` struct
+- Response headers support in `AppResponse` struct
+- `AppResponse::new()` constructor for simplified response creation
+- `AppResponse::with_header()` method for chainable header setting
+- `Default` trait implementation for `App` struct
+- Automatic `Content-Type: text/plain` header for 404 responses
+- Updated integration tests to use new response construction pattern
+- Extracted test helpers into separate `helpers.rs` module
+
+### Changed
+- **BREAKING**: `AppRequest` now includes `headers: HashMap<String, String>` field
+- **BREAKING**: `AppResponse` now includes `headers: HashMap<String, String>` field
+- Updated all example handlers to use new `AppResponse::new()` constructor
+- Improved response building with automatic header injection in HTTP layer
+- Enhanced request processing to extract and pass headers from incoming requests
+
+### Technical Details
+- Headers are now properly extracted from incoming HTTP requests
+- Response headers are correctly set in outgoing HTTP responses
+- Maintains backward compatibility through new constructor methods
+- Test suite refactored for better organization and reusability
 
 ## [0.1.0] - 2025-09-29
 
@@ -71,8 +95,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - No request body parsing yet
 - No query parameter support
 - No path parameter support (e.g., `/users/:id`)
-- No request headers exposed to handlers
-- No response headers customization
 - Simple exact path matching only
 - No middleware support
 - Single-threaded within each connection
