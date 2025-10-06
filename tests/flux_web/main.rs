@@ -1,7 +1,10 @@
 // tests/integration_tests.rs
 
 // dependencies
-use crate::helpers::{make_request, make_request_with_headers, make_request_with_method_and_headers, start_test_server};
+use crate::helpers::{
+    make_request, make_request_with_headers, make_request_with_method_and_headers,
+    start_test_server,
+};
 use flux_web_lib::{App, AppRequest, AppResponse};
 use http_body_util::{BodyExt, Empty};
 use hyper::body::Bytes;
@@ -270,15 +273,22 @@ async fn test_request_headers_are_accessible() {
     let mut app = App::new();
 
     app.get("/headers", |req: &AppRequest| {
-        let user_agent = req.headers.get("user-agent")
+        let user_agent = req
+            .headers
+            .get("user-agent")
             .map(|s| s.as_str())
             .unwrap_or("Unknown");
-        let custom_header = req.headers.get("x-custom-header")
+        let custom_header = req
+            .headers
+            .get("x-custom-header")
             .map(|s| s.as_str())
             .unwrap_or("Not found");
 
-        AppResponse::new(200, format!("User-Agent: {}, Custom: {}", user_agent, custom_header))
-            .with_header("Content-Type", "text/plain")
+        AppResponse::new(
+            200,
+            format!("User-Agent: {}, Custom: {}", user_agent, custom_header),
+        )
+        .with_header("Content-Type", "text/plain")
     });
 
     start_test_server(8008, app).await;
@@ -287,9 +297,10 @@ async fn test_request_headers_are_accessible() {
     headers.insert("user-agent", "Flux-Web-Test/1.0");
     headers.insert("x-custom-header", "test-value");
 
-    let (status, body, _response_headers) = make_request_with_headers("http://127.0.0.1:8008/headers", headers)
-        .await
-        .expect("Request failed");
+    let (status, body, _response_headers) =
+        make_request_with_headers("http://127.0.0.1:8008/headers", headers)
+            .await
+            .expect("Request failed");
 
     assert_eq!(status, 200);
     assert_eq!(body, "User-Agent: Flux-Web-Test/1.0, Custom: test-value");
@@ -309,18 +320,31 @@ async fn test_response_headers_are_set() {
 
     start_test_server(8009, app).await;
 
-    let (status, body, response_headers) = make_request_with_headers("http://127.0.0.1:8009/api/data", HashMap::new())
-        .await
-        .expect("Request failed");
+    let (status, body, response_headers) =
+        make_request_with_headers("http://127.0.0.1:8009/api/data", HashMap::new())
+            .await
+            .expect("Request failed");
 
     assert_eq!(status, 200);
     assert_eq!(body, r#"{"message": "Hello, API!"}"#);
 
     // Check response headers
-    assert_eq!(response_headers.get("content-type"), Some(&"application/json".to_string()));
-    assert_eq!(response_headers.get("access-control-allow-origin"), Some(&"*".to_string()));
-    assert_eq!(response_headers.get("cache-control"), Some(&"no-cache".to_string()));
-    assert_eq!(response_headers.get("x-api-version"), Some(&"1.0".to_string()));
+    assert_eq!(
+        response_headers.get("content-type"),
+        Some(&"application/json".to_string())
+    );
+    assert_eq!(
+        response_headers.get("access-control-allow-origin"),
+        Some(&"*".to_string())
+    );
+    assert_eq!(
+        response_headers.get("cache-control"),
+        Some(&"no-cache".to_string())
+    );
+    assert_eq!(
+        response_headers.get("x-api-version"),
+        Some(&"1.0".to_string())
+    );
 }
 
 #[tokio::test]
@@ -341,20 +365,35 @@ async fn test_multiple_headers_chaining() {
     let (status, body, response_headers) = make_request_with_method_and_headers(
         "http://127.0.0.1:8010/upload",
         "POST",
-        HashMap::new()
+        HashMap::new(),
     )
-        .await
-        .expect("Request failed");
+    .await
+    .expect("Request failed");
 
     assert_eq!(status, 201);
     assert_eq!(body, "File uploaded successfully");
 
     // Verify all chained headers are present
-    assert_eq!(response_headers.get("content-type"), Some(&"text/plain".to_string()));
-    assert_eq!(response_headers.get("location"), Some(&"/files/123".to_string()));
-    assert_eq!(response_headers.get("x-upload-status"), Some(&"completed".to_string()));
-    assert_eq!(response_headers.get("x-file-size"), Some(&"1024".to_string()));
-    assert_eq!(response_headers.get("x-processing-time"), Some(&"50ms".to_string()));
+    assert_eq!(
+        response_headers.get("content-type"),
+        Some(&"text/plain".to_string())
+    );
+    assert_eq!(
+        response_headers.get("location"),
+        Some(&"/files/123".to_string())
+    );
+    assert_eq!(
+        response_headers.get("x-upload-status"),
+        Some(&"completed".to_string())
+    );
+    assert_eq!(
+        response_headers.get("x-file-size"),
+        Some(&"1024".to_string())
+    );
+    assert_eq!(
+        response_headers.get("x-processing-time"),
+        Some(&"50ms".to_string())
+    );
 }
 
 #[tokio::test]
@@ -363,29 +402,40 @@ async fn test_request_headers_case_insensitive_access() {
 
     app.get("/case-test", |req: &AppRequest| {
         // Headers should be lowercase when stored
-        let content_type = req.headers.get("content-type")
+        let content_type = req
+            .headers
+            .get("content-type")
             .map(|s| s.as_str())
             .unwrap_or("text/plain");
-        let authorization = req.headers.get("authorization")
+        let authorization = req
+            .headers
+            .get("authorization")
             .map(|s| s.as_str())
             .unwrap_or("none");
 
-        AppResponse::new(200, format!("Content-Type: {}, Auth: {}", content_type, authorization))
-            .with_header("Content-Type", "text/plain")
+        AppResponse::new(
+            200,
+            format!("Content-Type: {}, Auth: {}", content_type, authorization),
+        )
+        .with_header("Content-Type", "text/plain")
     });
 
     start_test_server(8011, app).await;
 
     let mut headers = HashMap::new();
-    headers.insert("Content-Type", "application/json");  // Mixed case
-    headers.insert("Authorization", "Bearer token123");   // Mixed case
+    headers.insert("Content-Type", "application/json"); // Mixed case
+    headers.insert("Authorization", "Bearer token123"); // Mixed case
 
-    let (status, body, _response_headers) = make_request_with_headers("http://127.0.0.1:8011/case-test", headers)
-        .await
-        .expect("Request failed");
+    let (status, body, _response_headers) =
+        make_request_with_headers("http://127.0.0.1:8011/case-test", headers)
+            .await
+            .expect("Request failed");
 
     assert_eq!(status, 200);
-    assert_eq!(body, "Content-Type: application/json, Auth: Bearer token123");
+    assert_eq!(
+        body,
+        "Content-Type: application/json, Auth: Bearer token123"
+    );
 }
 
 #[tokio::test]
@@ -393,7 +443,9 @@ async fn test_missing_request_headers_handled() {
     let mut app = App::new();
 
     app.get("/optional-headers", |req: &AppRequest| {
-        let optional_header = req.headers.get("x-optional-header")
+        let optional_header = req
+            .headers
+            .get("x-optional-header")
             .cloned()
             .unwrap_or_else(|| "default-value".to_string());
 
@@ -404,9 +456,10 @@ async fn test_missing_request_headers_handled() {
     start_test_server(8012, app).await;
 
     // Test without the optional header
-    let (status, body, _response_headers) = make_request_with_headers("http://127.0.0.1:8012/optional-headers", HashMap::new())
-        .await
-        .expect("Request failed");
+    let (status, body, _response_headers) =
+        make_request_with_headers("http://127.0.0.1:8012/optional-headers", HashMap::new())
+            .await
+            .expect("Request failed");
 
     assert_eq!(status, 200);
     assert_eq!(body, "Optional header: default-value");
@@ -415,9 +468,10 @@ async fn test_missing_request_headers_handled() {
     let mut headers = HashMap::new();
     headers.insert("x-optional-header", "provided-value");
 
-    let (status, body, _response_headers) = make_request_with_headers("http://127.0.0.1:8012/optional-headers", headers)
-        .await
-        .expect("Request failed");
+    let (status, body, _response_headers) =
+        make_request_with_headers("http://127.0.0.1:8012/optional-headers", headers)
+            .await
+            .expect("Request failed");
 
     assert_eq!(status, 200);
     assert_eq!(body, "Optional header: provided-value");
@@ -433,15 +487,19 @@ async fn test_404_response_has_default_headers() {
 
     start_test_server(8013, app).await;
 
-    let (status, body, response_headers) = make_request_with_headers("http://127.0.0.1:8013/does-not-exist", HashMap::new())
-        .await
-        .expect("Request failed");
+    let (status, body, response_headers) =
+        make_request_with_headers("http://127.0.0.1:8013/does-not-exist", HashMap::new())
+            .await
+            .expect("Request failed");
 
     assert_eq!(status, 404);
     assert_eq!(body, "Not Found");
 
     // 404 responses should have default Content-Type header
-    assert_eq!(response_headers.get("content-type"), Some(&"text/plain".to_string()));
+    assert_eq!(
+        response_headers.get("content-type"),
+        Some(&"text/plain".to_string())
+    );
 }
 
 #[tokio::test]
@@ -452,20 +510,24 @@ async fn test_header_override_within_response() {
         AppResponse::new(200, "Response with overridden header")
             .with_header("Content-Type", "text/plain")
             .with_header("X-Version", "1.0")
-            .with_header("Content-Type", "application/json")  // Override previous Content-Type
-            .with_header("X-Version", "2.0")  // Override previous X-Version
+            .with_header("Content-Type", "application/json") // Override previous Content-Type
+            .with_header("X-Version", "2.0") // Override previous X-Version
     });
 
     start_test_server(8014, app).await;
 
-    let (status, body, response_headers) = make_request_with_headers("http://127.0.0.1:8014/override", HashMap::new())
-        .await
-        .expect("Request failed");
+    let (status, body, response_headers) =
+        make_request_with_headers("http://127.0.0.1:8014/override", HashMap::new())
+            .await
+            .expect("Request failed");
 
     assert_eq!(status, 200);
     assert_eq!(body, "Response with overridden header");
 
     // Last header value should win
-    assert_eq!(response_headers.get("content-type"), Some(&"application/json".to_string()));
+    assert_eq!(
+        response_headers.get("content-type"),
+        Some(&"application/json".to_string())
+    );
     assert_eq!(response_headers.get("x-version"), Some(&"2.0".to_string()));
 }

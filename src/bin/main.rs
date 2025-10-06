@@ -7,9 +7,9 @@ use flux_web_lib::{App, AppRequest, AppResponse};
 async fn main() {
     let mut app = App::new();
 
-    app.get("/", |_req: &AppRequest| {
-        AppResponse::new(200, "Hello, world!").with_header("Content-Type", "text/plain")
+    app.get("/health_check", |_req: &AppRequest| {
+        AppResponse::status(200)
     });
 
-    app.listen(8000).await;
+    app.listen(8080).await;
 }

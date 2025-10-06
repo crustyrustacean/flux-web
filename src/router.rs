@@ -2,6 +2,8 @@
 
 // dependencies
 use crate::method::{Method, convert_method};
+use http_body_util::{BodyExt, Full};
+use hyper::body::Bytes;
 use hyper::server::conn::http1;
 use hyper::service::service_fn;
 use hyper::{Request, Response};
@@ -57,13 +59,14 @@ pub struct AppRequest {
     pub method: Method,
     pub headers: HashMap<String, String>,
     pub path: String,
+    pub body: Vec<u8>,
 }
 
 // struct type to represent a flux-web response
 pub struct AppResponse {
     pub status: u16,
     pub headers: HashMap<String, String>,
-    pub body: String,
+    pub body: Option<Vec<u8>>,
 }
 
 // methods for the AppResponse type
@@ -72,7 +75,51 @@ impl AppResponse {
         AppResponse {
             status,
             headers: HashMap::new(),
-            body: body.into(),
+            body: Some(body.into().into_bytes()),
+        }
+    }
+
+    pub fn status(code: u16) -> Self {
+        AppResponse {
+            status: code,
+            headers: HashMap::new(),
+            body: None,
+        }
+    }
+
+    pub fn ok(body: impl Into<String>) -> Self {
+        Self::new(200, body)
+    }
+
+    pub fn created(body: impl Into<String>) -> Self {
+        Self::new(201, body)
+    }
+
+    pub fn no_content() -> Self {
+        AppResponse {
+            status: 204,
+            headers: HashMap::new(),
+            body: None,
+        }
+    }
+
+    pub fn bad_request(body: impl Into<String>) -> Self {
+        Self::new(400, body)
+    }
+
+    pub fn not_found(body: impl Into<String>) -> Self {
+        Self::new(404, body)
+    }
+
+    pub fn internal_error(body: impl Into<String>) -> Self {
+        Self::new(500, body)
+    }
+
+    pub fn with_bytes(status: u16, bytes: Vec<u8>) -> Self {
+        AppResponse {
+            status,
+            headers: HashMap::new(),
+            body: Some(bytes),
         }
     }
 
@@ -98,7 +145,7 @@ where
     F: for<'a> Fn(&'a AppRequest) -> AppResponse + Send + Sync,
 {
     fn handle(&self, req: &AppRequest) -> AppResponse {
-        self(req) // Just call the closure
+        self(req)
     }
 }
 
@@ -183,20 +230,25 @@ impl Default for App {
 async fn handle_request(
     hyper_req: Request<hyper::body::Incoming>,
     router: Arc<Router>,
-) -> Result<Response<String>, hyper::Error> {
-    let method = convert_method(hyper_req.method());
-    let path = hyper_req.uri().path();
+) -> Result<Response<Full<Bytes>>, hyper::Error> {
+    let (parts, body) = hyper_req.into_parts();
 
-    let headers: HashMap<String, String> = hyper_req
-        .headers()
+    let method = convert_method(&parts.method);
+    let path = parts.uri.path();
+
+    let headers: HashMap<String, String> = parts
+        .headers
         .iter()
         .map(|(name, value)| (name.to_string(), value.to_str().unwrap_or("").to_string()))
         .collect();
+
+    let body_bytes = body.collect().await?.to_bytes().to_vec();
 
     let app_req = AppRequest {
         method: method.clone(),
         headers,
         path: path.to_string(),
+        body: body_bytes,
     };
 
     let response = if let Some(handler) = router.find_route(&method, path) {
@@ -205,11 +257,7 @@ async fn handle_request(
         let mut headers = HashMap::new();
         headers.insert("Content-Type".to_string(), "text/plain".to_string());
 
-        AppResponse {
-            status: 404,
-            headers,
-            body: "Not Found".to_string(),
-        }
+        AppResponse::new(404, "Not Found").with_header("Content-Type", "text/plain")
     };
 
     let response_builder = response.headers.iter().fold(
@@ -217,5 +265,7 @@ async fn handle_request(
         |builder, (key, value)| builder.header(key, value),
     );
 
-    Ok(response_builder.body(response.body).unwrap())
+    let body = response.body.unwrap_or_default();
+    let body = Full::new(Bytes::from(body));
+    Ok(response_builder.body(body).unwrap())
 }
