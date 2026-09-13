@@ -7,7 +7,50 @@
 // **Two kinds of stuck:** *I don't know what* → shrink. *I don't know how* → look it up (docs, examples first). Name which one before doing anything.
 // **Run it, don't judge it.** Trace on paper, compiler, print, debugger — any cheap judge beats the one in your head.
 
+use std::collections::HashMap;
+use std::io::{Read, Write};
 use std::net::TcpListener;
+
+#[derive(Debug)]
+#[allow(dead_code)]
+struct Request {
+    method: String,
+    path: String,
+    version: String,
+    headers: HashMap<String, String>,
+    body: String,
+}
+
+#[derive(Debug)]
+#[allow(dead_code)]
+struct Response {
+    status_line: (String, u16, String),
+    headers: HashMap<String, String>,
+    body: String,
+}
+
+impl Response {
+    // TODO: implement
+}
+
+// function which accepts a path and returns a response (status code and body)
+fn route(req: Request) -> String {
+    if req.path == "/" {
+        build_response("200 OK", &std::fs::read_to_string("index.html").unwrap())
+    } else {
+        build_response("404 NOT FOUND", "Nothing here by that name.")
+    }
+}
+
+// function which takes a string slice and returns a response message
+fn build_response(status: &str, body: &str) -> String {
+    format!(
+        "HTTP/1.1 {}\r\nContent-Length: {}\r\n\r\n{}",
+        status,
+        body.len(),
+        body,
+    )
+}
 
 fn main() -> std::io::Result<()> {
     // make a listener
@@ -15,7 +58,61 @@ fn main() -> std::io::Result<()> {
 
     for stream in listener.incoming() {
         match stream {
-            Ok(_) => println!("We got one!"),
+            Ok(mut stream) => {
+                // accumulate the incoming bytes
+                let mut buffer: [u8; 4096] = [0; 4096];
+                let mut chunks: Vec<u8> = Vec::new();
+                let header_end = loop {
+                    let n = stream.read(&mut buffer)?;
+                    if n == 0 {
+                        break chunks.len();
+                    }
+                    chunks.extend_from_slice(&buffer[..n]);
+
+                    match chunks.windows(4).position(|w| w == b"\r\n\r\n") {
+                        Some(index) => break index,
+                        None => continue,
+                    }
+                };
+
+                // parse the incoming request
+                let raw_request_headers = String::from_utf8_lossy(&chunks[..header_end]);
+
+                // get the method, path, and version
+                let request_method_path_version = raw_request_headers.lines().next().unwrap();
+
+                // get the headers
+                let mut request_headers: HashMap<String, String> = HashMap::new();
+                for line in raw_request_headers.lines().skip(1) {
+                    let parts = line.split_once(":");
+                    match parts {
+                        Some((name, value)) => {
+                            request_headers.insert(name.to_string(), value.trim().to_string());
+                        }
+                        None => break,
+                    }
+                }
+
+                // split the first line into method, path, version
+                let request_method_path_version_parts: Vec<&str> =
+                    request_method_path_version.split(" ").collect();
+
+                // build the request by assembling the parts
+                let request = Request {
+                    method: request_method_path_version_parts[0].to_string(),
+                    path: request_method_path_version_parts[1].to_string(),
+                    version: request_method_path_version_parts[2].to_string(),
+                    headers: request_headers,
+                    body: String::from_utf8_lossy(&chunks[header_end + 4..]).to_string(),
+                };
+                println!("{:#?}", request);
+
+                // match on the path, which is held by `first_line_parts[1], send a `200 OK` and a
+                // message for the `/` route
+                // send a `404 NOT FOUND` and a message for anything else
+                let response = route(request);
+                stream.write_all(response.as_bytes())?;
+            }
             Err(e) => eprintln!("{}", e),
         }
     }
