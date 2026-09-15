@@ -43,20 +43,29 @@ impl std::fmt::Display for Response {
     }
 }
 
+// function for the index route
+fn index(_req: &Request) -> Response {
+    Response {
+        status_line: ("HTTP/1.1".to_string(), 200, "OK".to_string()),
+        headers: HashMap::new(),
+        body: std::fs::read_to_string("index.html").unwrap(),
+    }
+}
+
+// function for the not found route
+fn not_found(_req: &Request) -> Response {
+    Response {
+        status_line: ("HTTP/1.1".to_string(), 404, "NOT FOUND".to_string()),
+        headers: HashMap::new(),
+        body: "Nothing here by that name.".to_string(),
+    }
+}
+
 // function which accepts a path and returns a response (status code and body)
 fn route(req: Request) -> Response {
-    if req.path == "/" {
-        Response {
-            status_line: ("HTTP/1.1".to_string(), 200, "OK".to_string()),
-            headers: HashMap::new(),
-            body: std::fs::read_to_string("index.html").unwrap(),
-        }
-    } else {
-        Response {
-            status_line: ("HTTP/1.1".to_string(), 404, "NOT FOUND".to_string()),
-            headers: HashMap::new(),
-            body: "Nothing here by that name.".to_string(),
-        }
+    match req.path.as_str() {
+        "/" => index(&req),
+        _ => not_found(&req),
     }
 }
 
