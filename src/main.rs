@@ -29,24 +29,34 @@ struct Response {
     body: String,
 }
 
-impl Response {
-    // function which takes a string slice and returns a response message
-    fn build_response(status: &str, body: &str) -> String {
-        format!(
-            "HTTP/1.1 {}\r\nContent-Length: {}\r\n\r\n{}",
-            status,
-            body.len(),
-            body,
+impl std::fmt::Display for Response {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{} {} {}\r\nContent-Length: {}\r\n\r\n{}",
+            self.status_line.0,
+            self.status_line.1,
+            self.status_line.2,
+            self.body.len(),
+            self.body,
         )
     }
 }
 
 // function which accepts a path and returns a response (status code and body)
-fn route(req: Request) -> String {
+fn route(req: Request) -> Response {
     if req.path == "/" {
-        Response::build_response("200 OK", &std::fs::read_to_string("index.html").unwrap())
+        Response {
+            status_line: ("HTTP/1.1".to_string(), 200, "OK".to_string()),
+            headers: HashMap::new(),
+            body: std::fs::read_to_string("index.html").unwrap(),
+        }
     } else {
-        Response::build_response("404 NOT FOUND", "Nothing here by that name.")
+        Response {
+            status_line: ("HTTP/1.1".to_string(), 404, "NOT FOUND".to_string()),
+            headers: HashMap::new(),
+            body: "Nothing here by that name.".to_string(),
+        }
     }
 }
 
@@ -74,7 +84,7 @@ fn main() -> std::io::Result<()> {
                     }
                 };
 
-                // parse the incoming request
+                // convert the raw incoming bytes into a string
                 let raw_request_headers = String::from_utf8_lossy(&chunks[..header_end]);
 
                 // get the method, path, and version
@@ -110,7 +120,7 @@ fn main() -> std::io::Result<()> {
                 // message for the `/` route
                 // send a `404 NOT FOUND` and a message for anything else
                 let response = route(request);
-                stream.write_all(response.as_bytes())?;
+                stream.write_all(response.to_string().as_bytes())?;
             }
             Err(e) => eprintln!("{}", e),
         }
