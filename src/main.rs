@@ -30,28 +30,27 @@ struct Response {
 }
 
 impl Response {
-    // TODO: implement
+    // function which takes a string slice and returns a response message
+    fn build_response(status: &str, body: &str) -> String {
+        format!(
+            "HTTP/1.1 {}\r\nContent-Length: {}\r\n\r\n{}",
+            status,
+            body.len(),
+            body,
+        )
+    }
 }
 
 // function which accepts a path and returns a response (status code and body)
 fn route(req: Request) -> String {
     if req.path == "/" {
-        build_response("200 OK", &std::fs::read_to_string("index.html").unwrap())
+        Response::build_response("200 OK", &std::fs::read_to_string("index.html").unwrap())
     } else {
-        build_response("404 NOT FOUND", "Nothing here by that name.")
+        Response::build_response("404 NOT FOUND", "Nothing here by that name.")
     }
 }
 
-// function which takes a string slice and returns a response message
-fn build_response(status: &str, body: &str) -> String {
-    format!(
-        "HTTP/1.1 {}\r\nContent-Length: {}\r\n\r\n{}",
-        status,
-        body.len(),
-        body,
-    )
-}
-
+// main function
 fn main() -> std::io::Result<()> {
     // make a listener
     let listener = TcpListener::bind("127.0.0.1:8000")?;
