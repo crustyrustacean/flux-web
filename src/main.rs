@@ -62,15 +62,19 @@ fn not_found(_req: &Request) -> Response {
 }
 
 // function which accepts a path and returns a response (status code and body)
-fn route(req: Request) -> Response {
-    match req.path.as_str() {
-        "/" => index(&req),
-        _ => not_found(&req),
+fn route(router: &HashMap<String, fn(&Request) -> Response>, req: Request) -> Response {
+    match router.get(&req.path) {
+        Some(handler) => handler(&req),
+        None => not_found(&req),
     }
 }
 
 // main function
 fn main() -> std::io::Result<()> {
+    // initialize the router
+    let mut router: HashMap<String, fn(&Request) -> Response> = HashMap::new();
+    router.insert("/".to_string(), index as fn(&Request) -> Response);
+
     // make a listener
     let listener = TcpListener::bind("127.0.0.1:8000")?;
 
@@ -128,7 +132,7 @@ fn main() -> std::io::Result<()> {
                 // match on the path, which is held by `first_line_parts[1], send a `200 OK` and a
                 // message for the `/` route
                 // send a `404 NOT FOUND` and a message for anything else
-                let response = route(request);
+                let response = route(&router, request);
                 stream.write_all(response.to_string().as_bytes())?;
             }
             Err(e) => eprintln!("{}", e),
