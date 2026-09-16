@@ -21,6 +21,41 @@ struct Request {
     body: String,
 }
 
+fn parse_request(chunks: &[u8]) -> Request {
+    let header_end = loop {
+        match chunks.windows(4).position(|w| w == b"\r\n\r\n") {
+            Some(index) => break index,
+            None => continue,
+        }
+    };
+
+    let raw_request_headers = String::from_utf8_lossy(&chunks[..header_end]);
+
+    let request_method_path_version = raw_request_headers.lines().next().unwrap();
+
+    let mut request_headers: HashMap<String, String> = HashMap::new();
+    for line in raw_request_headers.lines().skip(1) {
+        let parts = line.split_once(":");
+        match parts {
+            Some((name, value)) => {
+                request_headers.insert(name.to_string(), value.trim().to_string());
+            }
+            None => break,
+        }
+    }
+
+    let request_method_path_version_parts: Vec<&str> =
+        request_method_path_version.split(" ").collect();
+
+    Request {
+        method: request_method_path_version_parts[0].to_string(),
+        path: request_method_path_version_parts[1].to_string(),
+        version: request_method_path_version_parts[2].to_string(),
+        headers: request_headers,
+        body: String::from_utf8_lossy(&chunks[header_end + 4..]).to_string(),
+    }
+}
+
 #[derive(Debug)]
 #[allow(dead_code)]
 struct Response {
@@ -81,57 +116,23 @@ fn main() -> std::io::Result<()> {
     for stream in listener.incoming() {
         match stream {
             Ok(mut stream) => {
-                // accumulate the incoming bytes
                 let mut buffer: [u8; 4096] = [0; 4096];
                 let mut chunks: Vec<u8> = Vec::new();
-                let header_end = loop {
+                loop {
                     let n = stream.read(&mut buffer)?;
                     if n == 0 {
-                        break chunks.len();
+                        break;
                     }
                     chunks.extend_from_slice(&buffer[..n]);
 
                     match chunks.windows(4).position(|w| w == b"\r\n\r\n") {
-                        Some(index) => break index,
+                        Some(_) => break,
                         None => continue,
-                    }
-                };
-
-                // convert the raw incoming bytes into a string
-                let raw_request_headers = String::from_utf8_lossy(&chunks[..header_end]);
-
-                // get the method, path, and version
-                let request_method_path_version = raw_request_headers.lines().next().unwrap();
-
-                // get the headers
-                let mut request_headers: HashMap<String, String> = HashMap::new();
-                for line in raw_request_headers.lines().skip(1) {
-                    let parts = line.split_once(":");
-                    match parts {
-                        Some((name, value)) => {
-                            request_headers.insert(name.to_string(), value.trim().to_string());
-                        }
-                        None => break,
                     }
                 }
 
-                // split the first line into method, path, version
-                let request_method_path_version_parts: Vec<&str> =
-                    request_method_path_version.split(" ").collect();
+                let request = parse_request(&chunks);
 
-                // build the request by assembling the parts
-                let request = Request {
-                    method: request_method_path_version_parts[0].to_string(),
-                    path: request_method_path_version_parts[1].to_string(),
-                    version: request_method_path_version_parts[2].to_string(),
-                    headers: request_headers,
-                    body: String::from_utf8_lossy(&chunks[header_end + 4..]).to_string(),
-                };
-                println!("{:#?}", request);
-
-                // match on the path, which is held by `first_line_parts[1], send a `200 OK` and a
-                // message for the `/` route
-                // send a `404 NOT FOUND` and a message for anything else
                 let response = route(&router, request);
                 stream.write_all(response.to_string().as_bytes())?;
             }
@@ -139,4 +140,14 @@ fn main() -> std::io::Result<()> {
         }
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parse_request_converts_bytes_to_request_type() {
+        todo!()
+    }
 }
