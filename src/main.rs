@@ -21,17 +21,18 @@ struct Request {
     body: String,
 }
 
-fn parse_request(chunks: &[u8]) -> Request {
-    let header_end = loop {
-        match chunks.windows(4).position(|w| w == b"\r\n\r\n") {
-            Some(index) => break index,
-            None => continue,
-        }
+fn parse_request(chunks: &[u8]) -> Result<Request, String> {
+    let header_end = match chunks.windows(4).position(|w| w == b"\r\n\r\n") {
+        Some(index) => index,
+        None => return Err("Unable to determine the end of the request headers.".to_string()),
     };
 
     let raw_request_headers = String::from_utf8_lossy(&chunks[..header_end]);
 
-    let request_method_path_version = raw_request_headers.lines().next().unwrap();
+    let request_method_path_version = match raw_request_headers.lines().next() {
+        Some(raw_method_path_version) => raw_method_path_version,
+        None => return Err("empty request".to_string()),
+    };
 
     let mut request_headers: HashMap<String, String> = HashMap::new();
     for line in raw_request_headers.lines().skip(1) {
@@ -47,13 +48,13 @@ fn parse_request(chunks: &[u8]) -> Request {
     let request_method_path_version_parts: Vec<&str> =
         request_method_path_version.split(" ").collect();
 
-    Request {
+    Ok(Request {
         method: request_method_path_version_parts[0].to_string(),
         path: request_method_path_version_parts[1].to_string(),
         version: request_method_path_version_parts[2].to_string(),
         headers: request_headers,
         body: String::from_utf8_lossy(&chunks[header_end + 4..]).to_string(),
-    }
+    })
 }
 
 #[derive(Debug)]
@@ -96,6 +97,15 @@ fn not_found(_req: &Request) -> Response {
     }
 }
 
+// function for a bad request
+fn bad_request(error: String) -> Response {
+    Response {
+        status_line: ("HTTP/1.1".to_string(), 400, "BAD REQUEST".to_string()),
+        headers: HashMap::new(),
+        body: error.to_string(),
+    }
+}
+
 // function which accepts a path and returns a response (status code and body)
 fn route(router: &HashMap<String, fn(&Request) -> Response>, req: Request) -> Response {
     match router.get(&req.path) {
@@ -131,7 +141,14 @@ fn main() -> std::io::Result<()> {
                     }
                 }
 
-                let request = parse_request(&chunks);
+                let request = match parse_request(&chunks) {
+                    Ok(r) => r,
+                    Err(e) => {
+                        let bad = bad_request(e);
+                        stream.write_all(bad.to_string().as_bytes())?;
+                        continue;
+                    }
+                };
 
                 let response = route(&router, request);
                 stream.write_all(response.to_string().as_bytes())?;
